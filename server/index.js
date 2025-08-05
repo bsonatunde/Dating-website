@@ -1,3 +1,4 @@
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -41,11 +42,56 @@ app.post('/api/register', async (req, res) => {
       password: hashedPassword,
       gender,
       dob,
-      avatar
+      avatar,
     });
     await user.save();
-    res.status(201).json({ message: 'User registered successfully' });
-  } catch {
+    res.status(201).json({ message: 'User registered' });
+  } catch (err) {
+    console.error('Error registering user:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Block a user
+app.post('/api/block/:id', async (req, res) => {
+  try {
+    const { userId } = req.body; // userId = who is blocking
+    const targetId = req.params.id; // targetId = who is being blocked
+    if (!userId || !targetId) return res.status(400).json({ message: 'Missing userId or targetId' });
+    if (userId === targetId) return res.status(400).json({ message: 'Cannot block yourself' });
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.blockedUsers) user.blockedUsers = [];
+    if (!user.acceptedUsers) user.acceptedUsers = [];
+    if (!user.blockedUsers.includes(targetId)) user.blockedUsers.push(targetId);
+    // Optionally remove from acceptedUsers
+    user.acceptedUsers = user.acceptedUsers.filter(id => id.toString() !== targetId);
+    await user.save();
+    res.json({ message: 'User blocked' });
+  } catch (err) {
+    console.error('Error blocking user:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Accept a user (friend/connection)
+app.post('/api/accept/:id', async (req, res) => {
+  try {
+    const { userId } = req.body; // userId = who is accepting
+    const targetId = req.params.id; // targetId = who is being accepted
+    if (!userId || !targetId) return res.status(400).json({ message: 'Missing userId or targetId' });
+    if (userId === targetId) return res.status(400).json({ message: 'Cannot accept yourself' });
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.acceptedUsers) user.acceptedUsers = [];
+    if (!user.blockedUsers) user.blockedUsers = [];
+    if (!user.acceptedUsers.includes(targetId)) user.acceptedUsers.push(targetId);
+    // Optionally remove from blockedUsers
+    user.blockedUsers = user.blockedUsers.filter(id => id.toString() !== targetId);
+    await user.save();
+    res.json({ message: 'User accepted' });
+  } catch (err) {
+    console.error('Error accepting user:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -65,9 +111,11 @@ app.post('/api/login', async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+   
     const token = jwt.sign({ userId: user._id }, 'your_jwt_secret', { expiresIn: '7d' });
     res.json({ token, user: { id: user._id, username: user.username, email: user.email } });
-  } catch {
+  } catch (err) {
+    console.error('Error logging in user:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -78,7 +126,8 @@ app.get('/api/profile/:id', async (req, res) => {
     const user = await User.findById(req.params.id).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.json(user);
-  } catch {
+  } catch (err) {
+    console.error('Error fetching user profile:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -91,10 +140,13 @@ app.put('/api/profile/:id', async (req, res) => {
     const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true, select: '-password' });
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.json(user);
-  } catch {
+  } catch (err) {
+    console.error('Error updating user profile:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// REST API for chat history
 
 // REST API for chat history
 app.get('/api/messages/:user1/:user2', async (req, res) => {
@@ -107,7 +159,37 @@ app.get('/api/messages/:user1/:user2', async (req, res) => {
       ]
     }).sort('timestamp');
     res.json(messages);
-  } catch {
+  } catch (err) {
+    console.error('Error fetching messages:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// DELETE all messages between two users
+app.delete('/api/messages/:user1/:user2', async (req, res) => {
+  try {
+    const { user1, user2 } = req.params;
+    await Message.deleteMany({
+      $or: [
+        { sender: user1, receiver: user2 },
+        { sender: user2, receiver: user1 }
+      ]
+    });
+    res.json({ message: 'Chat deleted' });
+  } catch (err) {
+    console.error('Error deleting messages:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// DELETE a single message by ID
+app.delete('/api/message/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Message.findByIdAndDelete(id);
+    res.json({ message: 'Message deleted' });
+  } catch (err) {
+    console.error('Error deleting message:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -117,7 +199,8 @@ app.get('/api/users', async (req, res) => {
   try {
     const users = await User.find({}, 'username email bio avatar');
     res.json(users);
-  } catch {
+  } catch (err) {
+    console.error('Error fetching users:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -130,7 +213,8 @@ app.post('/api/request-reset', async (req, res) => {
     if (!user) return res.status(400).json({ message: 'User not found' });
     // In production, generate a token and send email. Here, just return a dummy token in the response.
     res.json({ message: 'Password reset link sent', resetToken: 'dummy-token' });
-  } catch {
+  } catch (err) {
+    console.error('Error requesting password reset:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -144,7 +228,8 @@ app.post('/api/reset-password', async (req, res) => {
     const user = await User.findOneAndUpdate({ email }, { password: hashed });
     if (!user) return res.status(400).json({ message: 'User not found' });
     res.json({ message: 'Password updated' });
-  } catch {
+  } catch (err) {
+    console.error('Error resetting password:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -158,20 +243,30 @@ app.post('/api/avatar/:id', async (req, res) => {
     const user = await User.findByIdAndUpdate(req.params.id, { avatar }, { new: true });
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.json({ avatar: user.avatar });
-  } catch {
+  } catch (err) {
+    console.error('Error uploading avatar:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
 // Unified Socket.IO for real-time chat and online users
-const onlineUsers = new Set();
+const onlineUsers = new Map(); // Changed to Map to store userId -> username pairs
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
   // User joins their room and is marked online
-  socket.on('join', (userId) => {
+  socket.on('join', async (userId) => {
     socket.join(userId.toString());
-    onlineUsers.add(userId.toString());
-    io.emit('online_users', Array.from(onlineUsers));
+    try {
+      // Fetch username from database
+      const user = await User.findById(userId).select('username');
+      if (user) {
+        onlineUsers.set(userId.toString(), user.username);
+        // Send array of usernames instead of IDs
+        io.emit('online_users', Array.from(onlineUsers.values()));
+      }
+    } catch (err) {
+      console.error('Error fetching user for online status:', err);
+    }
   });
   // Handle sending messages
   socket.on('send_message', async (data) => {
@@ -200,7 +295,8 @@ io.on('connection', (socket) => {
         onlineUsers.delete(room);
       }
     }
-    io.emit('online_users', Array.from(onlineUsers));
+    // Send updated list of usernames
+    io.emit('online_users', Array.from(onlineUsers.values()));
     console.log('User disconnected:', socket.id);
   });
 });

@@ -45,6 +45,11 @@ export default function UserSearch({ onSelect, currentUser }) {
     u.username.toLowerCase().includes(query.toLowerCase())
   );
 
+  // Block logic moved to Chat.jsx
+
+  // Accept user handler
+  // Accept logic moved to Chat.jsx
+
   return (
     <div style={{ maxWidth: 600, margin: '2rem auto', background: '#fff', borderRadius: 18, boxShadow: '0 4px 24px #0002', padding: 32 }}>
       <h2 style={{ color: '#1976d2', fontWeight: 700, fontSize: 28, marginBottom: 18, textAlign: 'center', letterSpacing: 1 }}>Contacts</h2>
@@ -91,13 +96,15 @@ export default function UserSearch({ onSelect, currentUser }) {
               <div style={{ color: '#888', fontSize: 15, marginBottom: 6, wordBreak: 'break-all' }}>{u.email}</div>
               {u.bio && <div style={{ marginTop: 4, fontSize: 15, color: '#444', background: '#f7faff', borderRadius: 8, padding: 8 }}>{u.bio}</div>}
             </div>
-            <div style={{ marginLeft: 18 }}>
+            <div style={{ marginLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button
                 onClick={() => handleChat(u)}
-                style={{ padding: '10px 26px', borderRadius: 8, background: 'linear-gradient(90deg, #1976d2 60%, #42a5f5 100%)', color: '#fff', border: 'none', fontWeight: 600, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #1976d233' }}
+                style={{ padding: '10px 26px', borderRadius: 8, background: 'linear-gradient(90deg, #1976d2 60%, #42a5f5 100%)', color: '#fff', border: 'none', fontWeight: 600, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #1976d233', marginBottom: 4 }}
               >
                 Chat
               </button>
+              {/* Accept button moved to Chat.jsx */}
+              {/* Block button moved to Chat.jsx */}
             </div>
           </div>
         ))}
